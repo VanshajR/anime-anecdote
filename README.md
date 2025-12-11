@@ -49,16 +49,6 @@ Visit `http://localhost:3000` to access the neon landing page. Clicking **Genera
 
 Deploy on Vercel for best results. Add the same env vars in the Vercel dashboard, enable the Edge runtime for `/api/card` automatically (handled via `export const runtime = "edge"`).
 
-#### Deploying to Vercel
-
-1. Click **New Project** in Vercel and import `https://github.com/VanshajR/anime-anecdote`.
-2. Environment variables (set for Preview + Production):
-	- `MAL_CLIENT_ID`
-	- `MAL_CLIENT_SECRET`
-	- `MAL_REDIRECT_URI` → e.g., `https://anime-anecdote.vercel.app/api/mal/callback` (must also match MAL console)
-	- `SESSION_SECRET` → new 32+ char random string
-3. Keep default build settings (`npm install`, `npm run build`, output `.next`).
-4. Deploy, then run through the MAL OAuth flow, `/recap` navigation, and “Export PNG” to verify the environment.
 
 ### Testing Checklist
 
