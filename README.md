@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Anime Anecdote
 
-## Getting Started
+Anime Anecdote is a neon MAL recap experience powered by live MyAnimeList data. Users authenticate with MAL, we pull their anime (and optionally manga) history for 2025, run it through our analytics engine, and render a 10-slide recap with charts, carousels, and a shareable card.
 
-First, run the development server:
+### Tech Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Next.js 15 App Router (TypeScript, strict mode)
+- Tailwind CSS 4 + custom CSS for neon visuals
+- Framer Motion, GSAP-ready animation pipeline
+- ECharts for genre visualization, custom heatmap + rating bars
+- SWR for client data fetching, Next.js API routes for MAL OAuth + analytics
+
+### Key Features
+
+- **MAL OAuth2 with PKCE** – secure login via `/api/mal/auth` + `/api/mal/callback` storing encrypted session cookies.
+- **Stateless analytics** – `/api/mal/getAnimeList` fetches anime/manga lists, crunches 2025-only data in `src/lib/analytics.ts` (watch time, genres, title counts, episode/chapter totals, hidden gem, binge speed, heatmap, rating deviation, anime of the year, etc.).
+- **Story-mode UI** – `/recap` renders 10 slides (welcome → share card) with desktop keyboard navigation + mobile scroll-snap.
+- **Shareable recap card** – `/api/card` uses `next/og` to output a PNG-ready poster, including a QR code generated client-side.
+- **Manga toggle** – landing page lets users opt into manga stats before we request authorization.
+
+### Environment Variables
+
+Create a `.env.local` with:
+
+```
+MAL_CLIENT_ID=your_mal_app_id
+MAL_CLIENT_SECRET=your_mal_app_secret
+MAL_REDIRECT_URI=https://your-domain.com/api/mal/callback
+SESSION_SECRET=32+character_random_string
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Visit `http://localhost:3000` to access the neon landing page. Clicking **Generate my recap** starts the MAL OAuth flow (be sure your redirect URI matches the one configured in MAL settings and `.env.local`).
 
-## Learn More
+### Preparing for GitHub
 
-To learn more about Next.js, take a look at the following resources:
+1. Install deps and validate locally: `npm install && npm run lint && npm run build`.
+2. Review changes with `git status` / `git diff`.
+3. Stage the app (skip artifacts like `.next`, `node_modules`, `.env.local` which are already ignored).
+4. Commit and push to the origin repo (e.g., `git commit -m "feat: ship recap" && git push origin master`).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Production
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Deploy on Vercel for best results. Add the same env vars in the Vercel dashboard, enable the Edge runtime for `/api/card` automatically (handled via `export const runtime = "edge"`).
 
-## Deploy on Vercel
+#### Deploying to Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Click **New Project** in Vercel and import `https://github.com/VanshajR/anime-anecdote`.
+2. Environment variables (set for Preview + Production):
+	- `MAL_CLIENT_ID`
+	- `MAL_CLIENT_SECRET`
+	- `MAL_REDIRECT_URI` → e.g., `https://anime-anecdote.vercel.app/api/mal/callback` (must also match MAL console)
+	- `SESSION_SECRET` → new 32+ char random string
+3. Keep default build settings (`npm install`, `npm run build`, output `.next`).
+4. Deploy, then run through the MAL OAuth flow, `/recap` navigation, and “Export PNG” to verify the environment.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Testing Checklist
+
+- `npm run lint` – ESLint (Next.js core web vitals) with TypeScript
+- Manual QA: MAL login, `/recap` navigation (desktop arrows + mobile scroll), PNG export button, manga toggle.
+
+### Folder Highlights
+
+- `src/lib` – MAL SDK helpers, analytics, session crypto helpers, constants/types.
+- `src/app/api/mal/*` – auth, callback, analytics fetcher.
+- `src/app/recap/slides` – slide-by-slide React components.
+- `src/components/charts` – ECharts donut + custom heatmap; `components/AnimatedNumber` for counters.
+
+Enjoy your 2025 Anime Anecdote. 🌌
