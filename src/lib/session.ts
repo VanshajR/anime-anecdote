@@ -12,7 +12,9 @@ const getKey = () => {
   return createHash("sha256").update(secret).digest();
 };
 
-export const encodeSession = (payload: MalSessionPayload): string => {
+// Generic AES-256-GCM session cookie. Used for the MAL session and the AniList session alike —
+// each provider stores its own payload shape under its own cookie name.
+export const encodeSession = <T>(payload: T): string => {
   const iv = randomBytes(IV_LENGTH);
   const cipher = createCipheriv(ALGORITHM, getKey(), iv);
   const json = JSON.stringify(payload);
@@ -21,7 +23,7 @@ export const encodeSession = (payload: MalSessionPayload): string => {
   return [iv.toString("base64"), authTag.toString("base64"), encrypted.toString("base64")].join(".");
 };
 
-export const decodeSession = (token: string | undefined): MalSessionPayload | null => {
+export const decodeSession = <T = MalSessionPayload>(token: string | undefined): T | null => {
   if (!token) return null;
   const [ivPart, tagPart, dataPart] = token.split(".");
   if (!ivPart || !tagPart || !dataPart) return null;
@@ -32,13 +34,13 @@ export const decodeSession = (token: string | undefined): MalSessionPayload | nu
       decipher.update(Buffer.from(dataPart, "base64")),
       decipher.final(),
     ]);
-    return JSON.parse(decrypted.toString()) as MalSessionPayload;
+    return JSON.parse(decrypted.toString()) as T;
   } catch {
     return null;
   }
 };
 
-export const isSessionExpired = (session: MalSessionPayload | null): boolean => {
+export const isSessionExpired = (session: { acquiredAt: number; expires_in: number } | null): boolean => {
   if (!session) return true;
   const elapsed = Date.now() - session.acquiredAt;
   // Refresh a minute before expiry

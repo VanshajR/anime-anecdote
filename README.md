@@ -1,65 +1,67 @@
-## Anime Anecdote
+# AniKit
 
-Anime Anecdote is a neon MAL recap experience powered by live MyAnimeList data. Users authenticate with MAL, we pull their anime (and optionally manga) history for 2025, run it through our analytics engine, and render a 10-slide recap with charts, carousels, and a shareable card.
+**AniKit** is a free, donation-supported anime-utilities site. It talks only to the official
+**MyAnimeList** and **AniList** APIs — nothing about streaming, no other-project coupling, and
+**nothing is stored server-side** (lists/stats stream live and are processed on the fly; the
+session lives only in an encrypted cookie).
 
-### Tech Stack
+## Tools
 
-- Next.js 15 App Router (TypeScript, strict mode)
-- Tailwind CSS 4 + custom CSS for neon visuals
-- Framer Motion, GSAP-ready animation pipeline
-- ECharts for genre visualization, custom heatmap + rating bars
-- SWR for client data fetching, Next.js API routes for MAL OAuth + analytics
+- **Wrapped** *(live)* — a Spotify-Wrapped-style anime recap. Connect **MAL or AniList**, pick an
+  analysis window (this/last season, this/last year, all time, or a custom range), and get a
+  kinetic, Persona-styled 12-slide recap: totals, genres, breakdown (formats / eras / studios /
+  list-health), top-rated, archetype, binge, activity, score fingerprint, the standout, and a
+  shareable card. Per-user accent color + light/dark theme.
+- **List Builder** *(planned)* — swipe to build & rate a list, export to MAL/AniList.
+- *(Roadmap: Stats dashboard, Recommendations, My List, Anime Details, Search/Discovery — see `ANIKIT_PLAN.md`.)*
 
-### Key Features
+## Stack
 
-- **MAL OAuth2 with PKCE** – secure login via `/api/mal/auth` + `/api/mal/callback` storing encrypted session cookies.
-- **Stateless analytics** – `/api/mal/getAnimeList` fetches anime/manga lists, crunches 2025-only data in `src/lib/analytics.ts` (watch time, genres, title counts, episode/chapter totals, hidden gem, binge speed, heatmap, rating deviation, anime of the year, etc.).
-- **Story-mode UI** – `/recap` renders 10 slides (welcome → share card) with desktop keyboard navigation + mobile scroll-snap.
-- **Shareable recap card** – `/api/card` uses `next/og` to output a PNG-ready poster, including a QR code generated client-side.
-- **Manga toggle** – landing page lets users opt into manga stats before we request authorization.
+Next 16 (App Router) · React 19 · TypeScript · Tailwind 4 · framer-motion · echarts · zustand ·
+swr · zod · `next/og` (share card) · canvas-confetti · qrcode.
 
-### Environment Variables
+## Key pieces
 
-Create a `.env.local` with:
+- `src/lib/analytics.ts` — **`buildAnalytics()` is a pure function** (provider-normalized list in →
+  stats out, no I/O). The reusable engine; keep it pure.
+- `src/lib/mal.ts` — MAL OAuth (PKCE **plain** — don't "fix" to S256) + paginated list/profile fetch.
+- `src/lib/anilist.ts` — AniList OAuth (standard code flow) + GraphQL list fetch + the normalizer
+  that maps AniList entries into the same `MalMediaNode` shape `buildAnalytics` consumes.
+- `src/lib/session.ts` — generic AES-256-GCM encrypted session cookie (one per provider).
+- `src/lib/constants.ts` — `resolveWindow()` (analysis-window presets + airing-vs-activity mode),
+  personality blueprints, provider config.
+- `src/app/api/{mal,anilist}/{auth,callback}` — OAuth. `src/app/api/wrapped/data` — provider-agnostic
+  recap data. `src/app/api/card` — the `next/og` share card (Holo Pull; landscape + portrait).
+- `src/app/wrapped/recap/*` — the recap shell + slides (the "Phantom" Persona skin, `.pw-*` in `globals.css`).
+
+## Environment
+
+Create `.env.local`:
 
 ```
-MAL_CLIENT_ID=your_mal_app_id
-MAL_CLIENT_SECRET=your_mal_app_secret
-MAL_REDIRECT_URI=https://your-domain.com/api/mal/callback
-SESSION_SECRET=32+character_random_string
+SESSION_SECRET=                       # 32+ char random string (encrypts the session cookie)
+
+# MyAnimeList
+MAL_CLIENT_ID=
+MAL_CLIENT_SECRET=
+MAL_REDIRECT_URI=http://localhost:3000/api/mal/callback
+
+# AniList
+ANILIST_CLIENT_ID=
+ANILIST_CLIENT_SECRET=
+ANILIST_REDIRECT_URI=http://localhost:3000/api/anilist/callback
 ```
 
-### Development
+Register the AniList client at <https://anilist.co/settings/developer> (set its redirect URL to match
+`ANILIST_REDIRECT_URI`). In production, point both redirect URIs at your deployed domain.
+
+## Development
 
 ```bash
 npm install
-npm run dev
+npm run dev      # localhost:3000
+npm run build    # production build (also the type-check; or `npx tsc --noEmit`)
+npm run lint
 ```
 
-Visit `http://localhost:3000` to access the neon landing page. Clicking **Generate my recap** starts the MAL OAuth flow (be sure your redirect URI matches the one configured in MAL settings and `.env.local`).
-
-### Preparing for GitHub
-
-1. Install deps and validate locally: `npm install && npm run lint && npm run build`.
-2. Review changes with `git status` / `git diff`.
-3. Stage the app (skip artifacts like `.next`, `node_modules`, `.env.local` which are already ignored).
-4. Commit and push to the origin repo (e.g., `git commit -m "feat: ship recap" && git push origin master`).
-
-### Production
-
-Deploy on Vercel for best results. Add the same env vars in the Vercel dashboard, enable the Edge runtime for `/api/card` automatically (handled via `export const runtime = "edge"`).
-
-
-### Testing Checklist
-
-- `npm run lint` – ESLint (Next.js core web vitals) with TypeScript
-- Manual QA: MAL login, `/recap` navigation (desktop arrows + mobile scroll), PNG export button, manga toggle.
-
-### Folder Highlights
-
-- `src/lib` – MAL SDK helpers, analytics, session crypto helpers, constants/types.
-- `src/app/api/mal/*` – auth, callback, analytics fetcher.
-- `src/app/recap/slides` – slide-by-slide React components.
-- `src/components/charts` – ECharts donut + custom heatmap; `components/AnimatedNumber` for counters.
-
-Enjoy your 2025 Anime Anecdote. 🌌
+No test suite. Deploy on Vercel.

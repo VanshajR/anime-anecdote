@@ -1,7 +1,6 @@
 import clsx, { type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { format } from "date-fns";
-import { ANALYTICS_END, ANALYTICS_START } from "./constants";
+import type { AnalyticsWindow } from "./types";
 
 export const cn = (...inputs: ClassValue[]) => twMerge(clsx(...inputs));
 
@@ -14,10 +13,13 @@ export const parseMalDate = (value?: string | null): Date | null => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
-export const isWithinWindow = (value?: string | Date | null): boolean => {
+export const isWithinWindow = (
+  value: string | Date | null | undefined,
+  window: Pick<AnalyticsWindow, "start" | "end">,
+): boolean => {
   const date = value instanceof Date ? value : parseMalDate(value);
   if (!date) return false;
-  return date >= ANALYTICS_START && date <= ANALYTICS_END;
+  return date >= window.start && date <= window.end;
 };
 
 export const formatHours = (hours: number): string => {
@@ -44,8 +46,4 @@ export const fromBase64Url = <T>(value: string): T | null => {
   }
 };
 
-export const describeWindow = (): string => {
-  const start = format(ANALYTICS_START, "MMM d");
-  const end = format(ANALYTICS_END, "MMM d");
-  return `${start} – ${end}, ${ANALYTICS_START.getUTCFullYear()}`;
-};
+export const describeWindow = (window: Pick<AnalyticsWindow, "label">): string => window.label;

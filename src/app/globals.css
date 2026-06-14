@@ -1,6 +1,20 @@
 @import "tailwindcss";
 
+/* ===== Manga Ink + Vermilion — LIGHT (default) ===== */
 :root {
+  --bg: #fbf7ec; /* paper */
+  --bg-panel: #fffdf6; /* card surface */
+  --bg-elev: #f1e9d6; /* chip / elevated */
+  --ink: #16130e; /* sumi ink text */
+  --line: rgba(22, 19, 14, 0.16);
+  --accent: #e8402a; /* vermilion */
+  --accent-ink: #fffdf6; /* readable text on the accent fill */
+  --accent-2: #27406b; /* indigo */
+  --accent-2-ink: #fffdf6;
+  --dot: rgba(22, 19, 14, 0.2); /* halftone */
+  --panel-shadow: 6px 6px 0 var(--ink);
+
+  /* legacy neon tokens — still used by the immersive Wrapped recap (kept dark) */
   --night: #030014;
   --night-soft: #080423;
   --night-alt: #100735;
@@ -10,13 +24,34 @@
   --neon-violet: #7c6bff;
   --flare: #ffaa31;
   --aqua: #48afff;
-  --grid-line: rgba(255, 255, 255, 0.08);
-  --glass: rgba(10, 8, 30, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --shadow-lift: 0 30px 60px rgba(2, 6, 23, 0.8);
+}
+
+/* ===== Manga Ink + Vermilion — DARK (sumi) ===== */
+[data-theme="dark"] {
+  --bg: #14110b;
+  --bg-panel: #1c1810;
+  --bg-elev: #262016;
+  --ink: #f4eede;
+  --line: rgba(244, 238, 222, 0.16);
+  --accent: #ff5638;
+  --accent-ink: #14110b;
+  --accent-2: #8ba6de;
+  --accent-2-ink: #14110b;
+  --dot: rgba(244, 238, 222, 0.16);
+  --panel-shadow: 6px 6px 0 rgba(0, 0, 0, 0.55);
 }
 
 @theme inline {
+  /* semantic palette (Manga Ink) */
+  --color-base: var(--bg);
+  --color-panel: var(--bg-panel);
+  --color-elev: var(--bg-elev);
+  --color-ink: var(--ink);
+  --color-accent: var(--accent);
+  --color-accent2: var(--accent-2);
+  --color-line: var(--line);
+
+  /* legacy (recap) */
   --color-night: var(--night);
   --color-night-soft: var(--night-soft);
   --color-night-alt: var(--night-alt);
@@ -26,6 +61,7 @@
   --color-neon-violet: var(--neon-violet);
   --color-flare: var(--flare);
   --color-aqua: var(--aqua);
+
   --font-display: var(--font-display);
   --font-tech: var(--font-tech);
 }
@@ -36,49 +72,39 @@
 
 body {
   min-height: 100vh;
-  background: radial-gradient(circle at top, rgba(84, 52, 255, 0.35), transparent 50%),
-    var(--night);
-  color: var(--snow);
+  background: var(--bg);
+  color: var(--ink);
   font-family: var(--font-display, "Space Grotesk", sans-serif);
   letter-spacing: 0.01em;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .bg-night {
   background-color: var(--night);
 }
-
 .text-snow {
   color: var(--snow);
 }
 
-.radial-mask {
-  position: relative;
-  min-height: 100vh;
-  background-image:
-    radial-gradient(circle at 20% 20%, rgba(255, 116, 197, 0.25), transparent 45%),
-    radial-gradient(circle at 80% 0%, rgba(79, 236, 255, 0.22), transparent 40%),
-    radial-gradient(circle at 50% 80%, rgba(126, 108, 255, 0.35), transparent 50%),
-    linear-gradient(145deg, rgba(8, 5, 25, 0.9), rgba(1, 0, 10, 0.95));
-}
-
+/* Scanline — dark-only retro texture */
 .scanline {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background-image: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.04) 1px,
-    transparent 1px
-  );
+  background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
   background-size: 100% 3px;
-  opacity: 0.3;
+  opacity: 0;
   mix-blend-mode: soft-light;
 }
+[data-theme="dark"] .scanline {
+  opacity: 0.3;
+}
 
+/* legacy glass panel (recap) */
 .glass-panel {
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-lift);
+  background: rgba(10, 8, 30, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 30px 60px rgba(2, 6, 23, 0.8);
   border-radius: 28px;
   backdrop-filter: blur(24px);
 }
@@ -86,43 +112,41 @@ body {
 .grid-overlay {
   position: relative;
 }
-
 .grid-overlay::before {
   content: "";
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
   background-size: 120px 120px;
   mask-image: radial-gradient(circle, #000, transparent 70%);
   opacity: 0.4;
   pointer-events: none;
 }
 
-.neon-border {
-  border-image: linear-gradient(120deg, var(--neon-pink), var(--neon-cyan)) 1;
-}
-
 .story-scroll {
   scroll-snap-type: y mandatory;
   overflow-y: auto;
 }
-
 .story-slide {
   scroll-snap-align: start;
   min-height: 100vh;
 }
 
 .stroke-glow {
+  text-shadow: 0 0 24px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+[data-theme="dark"] .stroke-glow {
   text-shadow:
-    0 0 25px rgba(255, 79, 216, 0.55),
-    0 0 80px rgba(93, 226, 255, 0.4);
+    0 0 25px rgba(255, 86, 56, 0.5),
+    0 0 80px rgba(139, 166, 222, 0.35);
 }
 
 .gradient-text {
-  background-image: linear-gradient(120deg, var(--neon-pink), var(--neon-cyan));
+  background-image: linear-gradient(120deg, var(--accent), var(--accent-2));
   -webkit-background-clip: text;
+  background-clip: text;
   color: transparent;
 }
 
@@ -132,15 +156,451 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
+/* ===== AniKit design language — "manga party menu" ===== */
+
+/* Vertical katakana tag */
+.kana-tag {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  letter-spacing: 0.18em;
+  font-feature-settings: "palt" 1;
+}
+
+/* Halftone / ben-day dot screentone */
+.halftone {
+  background-image: radial-gradient(currentColor 1.1px, transparent 1.2px);
+  background-size: 9px 9px;
+}
+
+/* Diagonal manga speed-streaks as a background layer */
+.diag-lines {
+  background-image: repeating-linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--ink) 7%, transparent) 0 1px,
+    transparent 1px 12px
+  );
+}
+
+/* Manga speed lines — converging strokes, corner burst */
+.speed-lines::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: repeating-conic-gradient(
+    from 0deg at 50% 50%,
+    color-mix(in srgb, var(--ink) 22%, transparent) 0deg 0.55deg,
+    transparent 0.55deg 3.4deg
+  );
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  mask-image: radial-gradient(circle at 50% 50%, transparent 38%, #000 72%);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 38%, #000 72%);
+}
+.speed-lines:hover::before,
+.speed-lines:focus-visible::before,
+.speed-lines[data-active="true"]::before {
+  opacity: 1;
+}
+
+/* Giant outlined katakana watermark */
+.kana-mega {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  color: transparent;
+  -webkit-text-stroke: 2px color-mix(in srgb, var(--ink) 9%, transparent);
+  line-height: 0.84;
+  user-select: none;
+}
+
+/* Hollow stroke text */
+.text-stroke {
+  color: transparent;
+  -webkit-text-stroke: 2px var(--ink);
+}
+
+/* Filled accent tab block (Persona-style label) */
+.tab-block {
+  clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+}
+
+/* Angled manga panel — cut corners */
+.panel-cut {
+  clip-path: polygon(
+    22px 0,
+    100% 0,
+    100% calc(100% - 22px),
+    calc(100% - 22px) 100%,
+    0 100%,
+    0 22px
+  );
+}
+
+/* Corner rarity flag (TCG) */
+.corner-flag {
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+/* Holo foil sheen sweep for selected card */
+.holo-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    color-mix(in srgb, var(--accent) 16%, transparent) 50%,
+    transparent 68%
+  );
+  background-size: 280% 280%;
+  background-position: 120% 0;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.holo-sheen[data-active="true"]::after {
+  opacity: 1;
+  animation: holo-pan 2.6s ease-in-out infinite;
+}
+@keyframes holo-pan {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -40% 0;
+  }
+}
+
+/* Eyecatch divider — the "次回" bumper rule */
+.eyecatch-rule {
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--accent) 0 18px, transparent 18px 26px);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+
+/* Subtitle / fansub bar */
+.subtitle-bar {
+  font-family: var(--font-tech, "JetBrains Mono", monospace);
+  letter-spacing: 0.04em;
+}
+
+/* The blinking selection cursor ▸ */
+.cmd-cursor {
+  animation: cmd-blink 1s steps(1) infinite;
+}
+@keyframes cmd-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* "PRESS START" arcade pulse */
+.press-start {
+  animation: press-pulse 1.6s ease-in-out infinite;
+}
+@keyframes press-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 10px;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--neon-pink), var(--neon-cyan));
+  background: var(--accent);
   border-radius: 999px;
 }
-
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+/* ===== CHARGE BURST — energy charge → color-cycle → radial detonation (Konami egg) ===== */
+.cb-backdrop {
+  animation: cb-backdrop 3.2s ease-out both;
+}
+@keyframes cb-backdrop {
+  0% { background-color: rgba(2, 1, 8, 0); }
+  9% { background-color: rgba(2, 1, 8, 0.94); }
+  80% { background-color: rgba(2, 1, 8, 0.94); }
+  90% { background-color: rgba(255, 255, 255, 0.97); }
+  100% { background-color: rgba(255, 255, 255, 0); }
+}
+
+/* rotating, color-cycling radial speed lines */
+.cb-rays {
+  background: repeating-conic-gradient(
+    from 0deg at 50% 50%,
+    #a6ff7a 0deg 0.55deg,
+    transparent 0.55deg 2.6deg
+  );
+  -webkit-mask-image: radial-gradient(circle, transparent 5%, #000 26%, #000 68%, transparent 88%);
+  mask-image: radial-gradient(circle, transparent 5%, #000 26%, #000 68%, transparent 88%);
+  animation:
+    cb-rays-scale 3.2s cubic-bezier(0.5, 0, 0.7, 1) both,
+    cb-spin 3.2s ease-in both,
+    cb-hue 3.2s linear both;
+}
+@keyframes cb-rays-scale {
+  0% { scale: 0.12; opacity: 0; }
+  18% { opacity: 0.45; }
+  55% { scale: 0.7; opacity: 0.8; }
+  82% { scale: 1.3; opacity: 1; }
+  92% { scale: 2.3; opacity: 1; }
+  100% { scale: 3.4; opacity: 0; }
+}
+@keyframes cb-spin {
+  0% { rotate: 0deg; }
+  100% { rotate: 34deg; }
+}
+@keyframes cb-hue {
+  0% { filter: hue-rotate(0deg) saturate(1.5) brightness(1); }
+  45% { filter: hue-rotate(150deg) saturate(1.7) brightness(1.05); }
+  75% { filter: hue-rotate(255deg) saturate(1.6) brightness(1.2); }
+  100% { filter: hue-rotate(300deg) saturate(1.4) brightness(2.4); }
+}
+
+/* white-hot core that detonates */
+.cb-core {
+  background: radial-gradient(
+    circle,
+    #ffffff 0%,
+    #fff7cf 16%,
+    rgba(255, 210, 63, 0.55) 36%,
+    rgba(166, 255, 122, 0.12) 60%,
+    transparent 74%
+  );
+  animation: cb-core 3.2s cubic-bezier(0.5, 0, 0.7, 1) both, cb-hue 3.2s linear both;
+}
+@keyframes cb-core {
+  0% { scale: 0; opacity: 0; }
+  18% { scale: 0.22; opacity: 0.85; }
+  55% { scale: 0.34; opacity: 0.9; }
+  80% { scale: 0.6; opacity: 1; }
+  90% { scale: 2.8; opacity: 1; }
+  100% { scale: 4.4; opacity: 0; }
+}
+
+/* rising light pillar (intro beat) */
+.cb-beam {
+  background: linear-gradient(to top, transparent, #cfe8ff 28%, #ffffff 65%, transparent);
+  filter: blur(2px) drop-shadow(0 0 22px #8fb3ff);
+  transform-origin: bottom center;
+  animation: cb-beam 1s ease-out both;
+}
+@keyframes cb-beam {
+  0% { translate: 0 55vh; scale: 1 0; opacity: 0; }
+  30% { opacity: 1; }
+  62% { translate: 0 0; scale: 1 1; opacity: 1; }
+  100% { translate: 0 -24vh; scale: 1 0.5; opacity: 0; }
+}
+
+/* lens flare bloom at the beam tip */
+.cb-flare {
+  background: radial-gradient(circle, #ffffff 0%, rgba(255, 255, 255, 0.6) 30%, transparent 70%);
+  animation: cb-flare 1.1s ease-out both;
+}
+@keyframes cb-flare {
+  0% { scale: 0; opacity: 0; }
+  40% { scale: 0.5; opacity: 0; }
+  55% { scale: 1.2; opacity: 1; }
+  100% { scale: 0.6; opacity: 0; }
+}
+
+/* impact shake at detonation */
+.cb-shake {
+  animation: cb-shake 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97) 2.45s both;
+}
+@keyframes cb-shake {
+  0%, 100% { translate: 0 0; }
+  15% { translate: -10px 6px; }
+  30% { translate: 9px -7px; }
+  45% { translate: -8px -5px; }
+  60% { translate: 7px 6px; }
+  80% { translate: -3px 2px; }
+}
+
+/* ===================================================================== *
+ *  PHANTOM — Wrapped recap identity (Persona-5-inspired)
+ *  A self-contained dark stage: crimson + cream + ink, jagged angular
+ *  panels, kinetic skewed typography, halftone + speed-line bursts.
+ *  Namespaced `.pw-*` and theme-independent (always reads like P5),
+ *  so it never collides with the Manga-Ink hub tokens.
+ * ===================================================================== */
+.pw-stage {
+  --pw-bg: #0b0a0d;
+  --pw-bg-2: #141015;
+  --pw-red: #e7251c;
+  --pw-red-deep: #a50f0a;
+  --pw-cream: #f6f1e6;
+  --pw-cream-dim: rgba(246, 241, 230, 0.62);
+  --pw-cream-faint: rgba(246, 241, 230, 0.12);
+  --pw-ink: #0b0a0d;
+  position: relative;
+  background: var(--pw-bg);
+  color: var(--pw-cream);
+  font-family: var(--font-display, "Space Grotesk", sans-serif);
+}
+
+/* Layered stage texture: crimson glow + halftone + diagonal slashes */
+.pw-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 12% -10%, color-mix(in srgb, var(--pw-red) 40%, transparent), transparent 55%),
+    radial-gradient(90% 70% at 100% 105%, color-mix(in srgb, var(--pw-red-deep) 32%, transparent), transparent 60%),
+    linear-gradient(180deg, #120c10, var(--pw-bg) 60%);
+  z-index: 0;
+}
+.pw-stage > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Halftone dot field (uses .halftone bg-image; sized + masked for the stage) */
+.pw-dots {
+  background-image: radial-gradient(rgba(246, 241, 230, 0.5) 1px, transparent 1.4px);
+  background-size: 11px 11px;
+}
+
+/* Diagonal speed-streak field */
+.pw-streaks {
+  background-image: repeating-linear-gradient(
+    118deg,
+    rgba(246, 241, 230, 0.06) 0 1px,
+    transparent 1px 13px
+  );
+}
+
+/* Converging red speed-lines burst (corner energy) */
+.pw-burst::before {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  pointer-events: none;
+  background: repeating-conic-gradient(
+    from 0deg at 50% 50%,
+    color-mix(in srgb, var(--pw-red) 50%, transparent) 0deg 0.5deg,
+    transparent 0.5deg 3.2deg
+  );
+  mask-image: radial-gradient(circle at 50% 50%, transparent 30%, #000 78%);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 30%, #000 78%);
+  opacity: 0.5;
+}
+
+/* Jagged "all-out-attack" panel — irregular cut corners */
+.pw-shard {
+  clip-path: polygon(
+    0 14px, 26px 0, calc(100% - 12px) 6px, 100% 30px,
+    calc(100% - 6px) 100%, 18px calc(100% - 8px), 6px calc(100% - 28px)
+  );
+}
+
+/* Standard angled panel (sharper than the hub's panel-cut) */
+.pw-panel {
+  clip-path: polygon(
+    0 0, calc(100% - 26px) 0, 100% 26px, 100% 100%, 26px 100%, 0 calc(100% - 26px)
+  );
+}
+
+/* Skewed crimson label tab */
+.pw-tab {
+  display: inline-block;
+  transform: skewX(-11deg);
+  background: var(--pw-red);
+  color: var(--pw-cream);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
+}
+.pw-tab > * {
+  display: inline-block;
+  transform: skewX(11deg);
+}
+
+/* Kinetic display heading — heavy, italic, skewed, tight */
+.pw-title {
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  transform: skewX(-7deg);
+  line-height: 0.86;
+}
+
+/* Cream knockout heading (P5 white-on-black slab) */
+.pw-slab {
+  background: var(--pw-cream);
+  color: var(--pw-ink);
+  transform: skewX(-7deg);
+}
+.pw-slab > * {
+  display: inline-block;
+  transform: skewX(7deg);
+}
+
+/* Giant condensed italic stat number */
+.pw-num {
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  line-height: 0.82;
+}
+
+/* Outlined crimson knockout text */
+.pw-stroke {
+  color: transparent;
+  -webkit-text-stroke: 2px var(--pw-red);
+}
+
+/* Diagonal divider slash */
+.pw-rule {
+  height: 3px;
+  background: var(--pw-red);
+  transform: skewX(-24deg);
+}
+
+/* Torn red edge accent strip */
+.pw-edge {
+  background: var(--pw-red);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 92% 60%, 78% 100%, 64% 55%, 50% 100%, 36% 58%, 22% 100%, 8% 62%, 0 100%);
+}
+
+/* Vertical katakana brand mark for the stage */
+.pw-kana {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(246, 241, 230, 0.12);
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cmd-cursor,
+  .press-start,
+  .holo-sheen[data-active="true"]::after,
+  .cb-backdrop,
+  .cb-rays,
+  .cb-core,
+  .cb-beam,
+  .cb-flare,
+  .cb-shake {
+    animation: none;
+  }
 }

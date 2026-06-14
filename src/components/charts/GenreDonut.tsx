@@ -16,22 +16,25 @@ export const GenreDonut = ({ data }: Props) => {
       {
         name: "Genres",
         type: "pie",
-        radius: ["40%", "70%"],
+        radius: ["42%", "72%"],
         avoidLabelOverlap: false,
         itemStyle: {
-          borderRadius: 12,
-          borderColor: "#050314",
-          borderWidth: 4,
+          borderColor: "#0d0a0e",
+          borderWidth: 3,
         },
         label: {
           show: true,
+          color: "#f6f1e6",
           formatter: "{b}\n{d}%",
-          fontSize: 14,
+          fontSize: 13,
+          fontWeight: 600,
         },
+        labelLine: { lineStyle: { color: "rgba(246,241,230,0.4)" } },
         data: data.map((genre) => ({ name: genre.name, value: genre.value })),
       },
     ],
-    color: ["#ff4fd8", "#4dfff1", "#7c6bff", "#ffaa31", "#48afff", "#ff85a1"],
+    // crimson → cream Phantom family
+    color: ["#e7251c", "#f6f1e6", "#a50f0a", "#d98a2b", "#8a4039", "#c9bfae", "#ef6a5e", "#5e1410"],
   };
 
   return <ReactECharts option={option} style={{ height: 320 }} />;

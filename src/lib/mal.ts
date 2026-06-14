@@ -17,7 +17,9 @@ const MAL_FIELDS = [
   "num_volumes",
   "average_episode_duration",
   "genres",
-  "list_status{start_date,finish_date,status,updated_at,num_episodes_watched,num_chapters_read,score}",
+  "studios",
+  "start_season",
+  "list_status{start_date,finish_date,status,updated_at,num_episodes_watched,num_chapters_read,score,is_rewatching}",
 ].join(",");
 
 export const generateVerifier = () => randomBytes(48).toString("base64url");

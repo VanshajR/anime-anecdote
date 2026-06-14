@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildAnalytics } from "@/lib/analytics";
-import { SESSION_COOKIE } from "@/lib/constants";
+import { DEFAULT_WINDOW_KEY, resolveWindow, SESSION_COOKIE } from "@/lib/constants";
 import { fetchAnimeList, fetchMangaList, fetchProfile, refreshMalToken } from "@/lib/mal";
 import { decodeSession, encodeSession, isSessionExpired } from "@/lib/session";
+import type { WindowKey } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
   const cookie = request.cookies.get(SESSION_COOKIE)?.value;
@@ -26,6 +27,13 @@ export async function GET(request: NextRequest) {
       };
     }
 
+    const params = request.nextUrl.searchParams;
+    const windowKey = (params.get("w") as WindowKey) || DEFAULT_WINDOW_KEY;
+    const window = resolveWindow(windowKey, {
+      start: params.get("s"),
+      end: params.get("e"),
+    });
+
     const [profile, anime, manga] = await Promise.all([
       fetchProfile(session),
       fetchAnimeList(session),
@@ -37,6 +45,7 @@ export async function GET(request: NextRequest) {
       anime,
       manga,
       session.includeManga,
+      window,
     );
 
     const response = NextResponse.json({ analytics });

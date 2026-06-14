@@ -1,22 +1,27 @@
 import { differenceInCalendarDays, format, isValid, parseISO } from "date-fns";
-import {
-  ANALYTICS_END,
-  ANALYTICS_START,
-  MANGA_CHAPTER_MINUTES,
-  PERSONALITY_BLUEPRINTS,
-} from "./constants";
+import { MANGA_CHAPTER_MINUTES, PERSONALITY_BLUEPRINTS } from "./constants";
 import {
   AnalyticsResult,
+  AnalyticsWindow,
   BingeFact,
+  ContrarianPick,
+  EraStat,
+  FormatStat,
   GenreCountStat,
   GenreStat,
+  HeatmapCell,
   HiddenGem,
   LibraryTotals,
+  ListHealth,
   MalMediaNode,
   PersonalityResult,
   RankedMedia,
+  ScoreBin,
+  StudioStat,
 } from "./types";
 import { clamp, hoursToDays, isWithinWindow, parseMalDate } from "./utils";
+
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 interface PreparedEntry {
   id: number;
@@ -29,12 +34,42 @@ interface PreparedEntry {
   malScore: number;
   durationHours: number;
   genres: string[];
+  studios: string[];
+  format: string;
+  releaseYear: number | null;
   start: Date | null;
   finish: Date | null;
   updated: Date | null;
   count: number;
   status?: string;
 }
+
+const FORMAT_LABELS: Record<string, string> = {
+  tv: "TV",
+  movie: "Movie",
+  ova: "OVA",
+  ona: "ONA",
+  special: "Special",
+  music: "Music",
+  manga: "Manga",
+  manhwa: "Manhwa",
+  novel: "Novel",
+  one_shot: "One-shot",
+  doujinshi: "Doujin",
+  unknown: "Other",
+};
+const formatLabel = (raw?: string) => FORMAT_LABELS[raw ?? "unknown"] ?? (raw ? raw.toUpperCase() : "Other");
+
+const SEASON_START_MONTH: Record<string, number> = { winter: 0, spring: 3, summer: 6, fall: 9 };
+
+/** The anime's premiere date — preferred from start_season (reliable), else parsed start_date. */
+const airDateOf = (node: MalMediaNode): Date | null => {
+  if (node.start_season) {
+    const m = SEASON_START_MONTH[node.start_season.season?.toLowerCase()] ?? 0;
+    return new Date(Date.UTC(node.start_season.year, m, 1));
+  }
+  return parseMalDate(node.start_date);
+};
 
 const withLocalizedTitles = (entry: PreparedEntry) => ({
   title: entry.title,
@@ -44,7 +79,7 @@ const withLocalizedTitles = (entry: PreparedEntry) => ({
 
 const MAL_MEAN_DEFAULT = 7;
 
-const prepareEntries = (nodes: MalMediaNode[], mediaType: "anime" | "manga") =>
+const prepareEntries = (nodes: MalMediaNode[], mediaType: "anime" | "manga", window: AnalyticsWindow) =>
   nodes
     .map<PreparedEntry | null>((node) => {
       const list = node.list_status;
@@ -53,7 +88,16 @@ const prepareEntries = (nodes: MalMediaNode[], mediaType: "anime" | "manga") =>
       const start = parseMalDate(list.start_date ?? node.start_date);
       const finish = parseMalDate(list.finish_date ?? node.end_date);
       const updated = parseMalDate(list.updated_at);
-      const relevant = [start, finish, updated].some((date) => date && isWithinWindow(date));
+
+      // "airing" windows (season presets) match the anime's PREMIERE; "activity" windows match
+      // when the user actually logged it (start/finish/updated).
+      const relevant =
+        window.mode === "airing"
+          ? (() => {
+              const air = airDateOf(node);
+              return !!air && isWithinWindow(air, window);
+            })()
+          : [start, finish, updated].some((date) => date && isWithinWindow(date, window));
       if (!relevant) return null;
 
       const titleEn = node.alternative_titles?.en ?? null;
@@ -72,6 +116,10 @@ const prepareEntries = (nodes: MalMediaNode[], mediaType: "anime" | "manga") =>
             3600
           : (count * MANGA_CHAPTER_MINUTES) / 60;
 
+      const releaseYear =
+        node.start_season?.year ??
+        (node.start_date ? Number(node.start_date.slice(0, 4)) || null : null);
+
       return {
         id: node.id,
         title: node.title,
@@ -83,6 +131,9 @@ const prepareEntries = (nodes: MalMediaNode[], mediaType: "anime" | "manga") =>
         malScore,
         durationHours,
         genres: node.genres?.map((genre) => genre.name) ?? [],
+        studios: node.studios?.map((studio) => studio.name) ?? [],
+        format: formatLabel(node.media_type),
+        releaseYear,
         start,
         finish,
         updated,
@@ -171,21 +222,28 @@ const topRanked = (entries: PreparedEntry[], limit: number, type: "anime" | "man
     }));
 
 const calcPersonality = (entries: PreparedEntry[]): PersonalityResult => {
-  const { distribution } = genreStats(entries);
-  const topGenre = distribution[0]?.name ?? "Fantasy";
   const badgePool: Record<string, PersonalityResult> = Object.fromEntries(
     PERSONALITY_BLUEPRINTS.map((blueprint) => [blueprint.key, blueprint as PersonalityResult]),
   );
 
-  if (["Psychological", "Sci-Fi", "Thriller"].includes(topGenre)) {
-    return badgePool["neon-mind"];
+  // Behavioral signals take precedence over genre — they're more distinctive.
+  const rated = entries.filter((e) => e.userScore > 0 && e.malScore > 0);
+  if (rated.length >= 8) {
+    const dev = rated.reduce((s, e) => s + (e.userScore - e.malScore), 0) / rated.length;
+    if (dev <= -1) return badgePool["critic"]; // rates notably tougher than the crowd
   }
-  if (["Action", "Adventure", "Shounen"].includes(topGenre)) {
-    return badgePool["shonen-spark"];
+  const tracked = entries.filter((e) => e.status);
+  if (tracked.length >= 12) {
+    const completed = tracked.filter((e) => e.status === "completed").length;
+    if (completed / tracked.length >= 0.85) return badgePool["completionist"];
   }
-  if (["Slice of Life", "Romance", "Drama"].includes(topGenre)) {
-    return badgePool["sakura-dream"];
-  }
+
+  // Otherwise, genre-driven.
+  const { distribution } = genreStats(entries);
+  const topGenre = distribution[0]?.name ?? "Fantasy";
+  if (["Psychological", "Sci-Fi", "Thriller", "Mystery"].includes(topGenre)) return badgePool["cipher-mind"];
+  if (["Action", "Adventure", "Shounen", "Sports"].includes(topGenre)) return badgePool["shonen-spark"];
+  if (["Slice of Life", "Romance", "Drama", "Comedy"].includes(topGenre)) return badgePool["sakura-dream"];
   return badgePool["void-rhythm"];
 };
 
@@ -197,7 +255,7 @@ const ratingDeviation = (entries: PreparedEntry[]) => {
   return Number((userAvg - malAvg).toFixed(1));
 };
 
-const calcBinge = (entries: PreparedEntry[]) => {
+const calcBinge = (entries: PreparedEntry[], window: AnalyticsWindow) => {
   const bingeable = entries.filter((entry) => entry.mediaType === "anime" && entry.start && entry.finish);
   const fastest = bingeable
     .map((entry) => {
@@ -215,7 +273,7 @@ const calcBinge = (entries: PreparedEntry[]) => {
   entries.forEach((entry) => {
     const finish = entry.finish ?? entry.updated;
     if (!finish) return;
-    if (!isWithinWindow(finish)) return;
+    if (!isWithinWindow(finish, window)) return;
     daySet.add(format(finish, "yyyy-MM-dd"));
   });
   const days = Array.from(daySet).sort();
@@ -241,28 +299,57 @@ const calcBinge = (entries: PreparedEntry[]) => {
   };
 };
 
-const calcHeatmap = (entries: PreparedEntry[]) => {
-  const base = Array.from({ length: 12 }, (_, index) => ({
-    month: format(new Date(ANALYTICS_START.getUTCFullYear(), index, 1), "MMM"),
-    value: 0,
-  }));
+/** Window-aware activity buckets: monthly across the span, or yearly when the span exceeds ~2 years
+ * (e.g. "All time"). Each bucket carries its own label so the slide can render a variable count. */
+const calcHeatmap = (entries: PreparedEntry[], window: AnalyticsWindow): HeatmapCell[] => {
+  const spanMonths =
+    (window.end.getUTCFullYear() - window.start.getUTCFullYear()) * 12 +
+    (window.end.getUTCMonth() - window.start.getUTCMonth());
 
-  entries.forEach((entry) => {
-    const finish = entry.finish ?? entry.updated;
-    if (!finish) return;
-    if (!isWithinWindow(finish)) return;
-    const month = finish.getUTCMonth();
-    base[month].value += 1;
-  });
+  const tally = (
+    buckets: HeatmapCell[],
+    indexFor: (date: Date) => number | undefined,
+  ): HeatmapCell[] => {
+    entries.forEach((entry) => {
+      const finish = entry.finish ?? entry.updated;
+      if (!finish || !isWithinWindow(finish, window)) return;
+      const i = indexFor(finish);
+      if (i !== undefined && buckets[i]) buckets[i].value += 1;
+    });
+    return buckets;
+  };
 
-  return base;
+  // >2 years → yearly buckets
+  if (spanMonths > 23) {
+    const y0 = window.start.getUTCFullYear();
+    const y1 = window.end.getUTCFullYear();
+    const buckets: HeatmapCell[] = [];
+    for (let y = y0; y <= y1; y += 1) buckets.push({ month: String(y), value: 0 });
+    return tally(buckets, (d) => d.getUTCFullYear() - y0);
+  }
+
+  // monthly buckets from window.start month → window.end month
+  const multiYear = window.start.getUTCFullYear() !== window.end.getUTCFullYear();
+  const buckets: HeatmapCell[] = [];
+  const idx = new Map<string, number>();
+  const cur = new Date(Date.UTC(window.start.getUTCFullYear(), window.start.getUTCMonth(), 1));
+  const last = new Date(Date.UTC(window.end.getUTCFullYear(), window.end.getUTCMonth(), 1));
+  while (cur <= last) {
+    const y = cur.getUTCFullYear();
+    const m = cur.getUTCMonth();
+    const label = multiYear ? `${MONTHS_SHORT[m]} '${String(y).slice(2)}` : MONTHS_SHORT[m];
+    idx.set(`${y}-${m}`, buckets.length);
+    buckets.push({ month: label, value: 0 });
+    cur.setUTCMonth(m + 1);
+  }
+  return tally(buckets, (d) => idx.get(`${d.getUTCFullYear()}-${d.getUTCMonth()}`));
 };
 
-const calcAnimeOfYear = (entries: PreparedEntry[]): RankedMedia | null => {
+const calcAnimeOfYear = (entries: PreparedEntry[], window: AnalyticsWindow): RankedMedia | null => {
   const candidate = entries
     .filter((entry) => entry.mediaType === "anime")
     .map((entry) => {
-      const recency = entry.finish ? 1 - clamp((ANALYTICS_END.getTime() - entry.finish.getTime()) / (1000 * 60 * 60 * 24 * 365), 0, 1) : 0.5;
+      const recency = entry.finish ? 1 - clamp((window.end.getTime() - entry.finish.getTime()) / (1000 * 60 * 60 * 24 * 365), 0, 1) : 0.5;
       const hoursScore = clamp(entry.durationHours / 40, 0, 1);
       const blend =
         entry.userScore * 0.5 + entry.malScore * 0.2 + hoursScore * 10 + recency * 10;
@@ -281,8 +368,122 @@ const calcAnimeOfYear = (entries: PreparedEntry[]): RankedMedia | null => {
     malScore: entry.malScore,
     hours: Number(entry.durationHours.toFixed(1)),
     mediaType: "anime",
-    detail: `${entry.count} episodes of pure 2025 energy`,
+    detail: `${entry.count} episodes`,
   } satisfies RankedMedia;
+};
+
+const scoreHistogram = (entries: PreparedEntry[]): ScoreBin[] => {
+  const counts = new Array(11).fill(0) as number[]; // index 1..10
+  entries.forEach((entry) => {
+    const s = Math.round(entry.userScore);
+    if (s >= 1 && s <= 10) counts[s] += 1;
+  });
+  return Array.from({ length: 10 }, (_, i) => ({ score: i + 1, count: counts[i + 1] }));
+};
+
+const formatStats = (entries: PreparedEntry[]): FormatStat[] => {
+  const bucket = new Map<string, { count: number; hours: number }>();
+  entries.forEach((entry) => {
+    const cur = bucket.get(entry.format) ?? { count: 0, hours: 0 };
+    cur.count += 1;
+    cur.hours += entry.durationHours;
+    bucket.set(entry.format, cur);
+  });
+  return Array.from(bucket.entries())
+    .map(([format, v]) => ({ format, count: v.count, hours: Number(v.hours.toFixed(1)) }))
+    .sort((a, b) => b.count - a.count);
+};
+
+const eraStats = (entries: PreparedEntry[]): EraStat[] => {
+  const bucket = new Map<number, number>();
+  entries.forEach((entry) => {
+    if (!entry.releaseYear) return;
+    const decade = Math.floor(entry.releaseYear / 10) * 10;
+    bucket.set(decade, (bucket.get(decade) ?? 0) + 1);
+  });
+  return Array.from(bucket.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([decade, count]) => ({ label: `${decade}s`, count }));
+};
+
+const studioStats = (entries: PreparedEntry[]): StudioStat[] => {
+  const bucket = new Map<string, number>();
+  entries.forEach((entry) => {
+    if (entry.mediaType !== "anime") return;
+    entry.studios.forEach((name) => bucket.set(name, (bucket.get(name) ?? 0) + 1));
+  });
+  return Array.from(bucket.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+};
+
+const computeListHealth = (entries: PreparedEntry[]): ListHealth => {
+  const tally = { completed: 0, watching: 0, dropped: 0, planToWatch: 0, onHold: 0 };
+  entries.forEach((entry) => {
+    switch (entry.status) {
+      case "completed":
+        tally.completed += 1;
+        break;
+      case "watching":
+      case "reading":
+        tally.watching += 1;
+        break;
+      case "dropped":
+        tally.dropped += 1;
+        break;
+      case "plan_to_watch":
+      case "plan_to_read":
+        tally.planToWatch += 1;
+        break;
+      case "on_hold":
+        tally.onHold += 1;
+        break;
+    }
+  });
+  const total = entries.length;
+  return {
+    ...tally,
+    total,
+    completionRate: total ? Number((tally.completed / total).toFixed(3)) : 0,
+    dropRate: total ? Number((tally.dropped / total).toFixed(3)) : 0,
+  };
+};
+
+const longestSeries = (entries: PreparedEntry[]): RankedMedia | null => {
+  const top = entries
+    .filter((e) => e.mediaType === "anime" && (e.count ?? 0) > 0)
+    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))[0];
+  if (!top) return null;
+  return {
+    id: top.id,
+    ...withLocalizedTitles(top),
+    cover: top.cover,
+    score: top.userScore,
+    malScore: top.malScore,
+    hours: Number(top.durationHours.toFixed(1)),
+    mediaType: "anime",
+    detail: `${top.count} episodes`,
+  };
+};
+
+const contrarianPick = (entries: PreparedEntry[], direction: "over" | "under"): ContrarianPick | null => {
+  const rated = entries
+    .filter((e) => e.userScore > 0 && e.malScore > 0)
+    .map((e) => ({ e, delta: e.userScore - e.malScore }));
+  if (!rated.length) return null;
+  // over = you rate it far below MAL (most negative); under = far above MAL (most positive)
+  const sorted = rated.sort((a, b) => (direction === "over" ? a.delta - b.delta : b.delta - a.delta));
+  const pick = sorted[0];
+  if (!pick || (direction === "over" ? pick.delta >= 0 : pick.delta <= 0)) return null;
+  return {
+    id: pick.e.id,
+    ...withLocalizedTitles(pick.e),
+    cover: pick.e.cover,
+    userScore: pick.e.userScore,
+    malScore: pick.e.malScore,
+    delta: Number(pick.delta.toFixed(1)),
+  };
 };
 
 export const buildAnalytics = (
@@ -290,9 +491,10 @@ export const buildAnalytics = (
   anime: MalMediaNode[],
   manga: MalMediaNode[],
   includeManga: boolean,
+  window: AnalyticsWindow,
 ): AnalyticsResult => {
-  const animeEntries = prepareEntries(anime, "anime");
-  const mangaEntries = includeManga ? prepareEntries(manga, "manga") : [];
+  const animeEntries = prepareEntries(anime, "anime", window);
+  const mangaEntries = includeManga ? prepareEntries(manga, "manga", window) : [];
   const allEntries = [...animeEntries, ...mangaEntries];
 
   const animeHours = animeEntries.reduce((sum, entry) => sum + entry.durationHours, 0);
@@ -303,11 +505,24 @@ export const buildAnalytics = (
   const hiddenGem = calcHiddenGem(animeEntries);
   const topShows = topRanked(animeEntries, 5, "anime");
   const mangaHighlights = includeManga ? topRanked(mangaEntries, 3, "manga") : [];
+  // For airing windows, the activity (finish) dates span beyond the season, so derive a window from
+  // the selected entries' actual completion dates for cadence/heatmap; activity windows use themselves.
+  const activityWindow: AnalyticsWindow =
+    window.mode === "activity"
+      ? window
+      : (() => {
+          const dates = allEntries
+            .map((e) => e.finish ?? e.updated)
+            .filter((d): d is Date => !!d)
+            .sort((a, b) => a.getTime() - b.getTime());
+          return dates.length ? { ...window, start: dates[0], end: dates[dates.length - 1] } : window;
+        })();
+
   const personality = calcPersonality(allEntries);
-  const binge = calcBinge(allEntries);
-  const heatmap = calcHeatmap(allEntries);
+  const binge = calcBinge(allEntries, activityWindow);
+  const heatmap = calcHeatmap(allEntries, activityWindow);
   const ratingDelta = ratingDeviation(allEntries);
-  const animeOfYear = calcAnimeOfYear(allEntries);
+  const animeOfYear = calcAnimeOfYear(allEntries, window);
 
   const userRated = allEntries.filter((entry) => entry.userScore > 0);
   const userAvg = userRated.length
@@ -317,9 +532,10 @@ export const buildAnalytics = (
     ? userRated.reduce((sum, entry) => sum + entry.malScore, 0) / userRated.length
     : 0;
 
-  const activitySummary = `${profile.name} spent ${combinedHours.toFixed(1)} hours immersed in ${genres.top3
-    .map((genre) => genre.name)
-    .join(", ")} stories during the 2025 season window.`;
+  const topGenreNames = genres.top3.map((genre) => genre.name).join(", ");
+  const activitySummary = `${profile.name} spent ${combinedHours.toFixed(1)} hours immersed in ${
+    topGenreNames || "all kinds of"
+  } stories — ${window.label}.`;
 
   const library: LibraryTotals = {
     animeTitles: animeEntries.length,
@@ -354,5 +570,14 @@ export const buildAnalytics = (
     animeOfYear,
     library,
     activitySummary,
+    scoreHistogram: scoreHistogram(allEntries),
+    formats: formatStats(allEntries),
+    eras: eraStats(allEntries),
+    studios: studioStats(animeEntries),
+    listHealth: computeListHealth(allEntries),
+    longest: longestSeries(animeEntries),
+    overrated: contrarianPick(allEntries, "over"),
+    underrated: contrarianPick(allEntries, "under"),
+    window: { key: window.key, label: window.label, presetLabel: window.presetLabel },
   } satisfies AnalyticsResult;
 };
